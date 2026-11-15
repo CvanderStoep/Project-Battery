@@ -1,0 +1,23 @@
+name: battery-revenue
+# Draait los van de home-automation stack, maar op hetzelfde Docker-netwerk (ha_network).
+# Secrets (token, org, bucket) staan in .env. Waarden onder "environment" hieronder
+# overschrijven .env, zodat dezelfde .env ook op de Mac (localhost) kan blijven werken.
+
+services:
+  battery-revenue:
+    build: .
+    container_name: battery-revenue
+    restart: always
+    env_file: .env
+    environment:
+      TZ: Europe/Amsterdam
+      INFLUX_URL: http://influxdb:8086   # containernaam op ha_network, niet localhost
+      RUN_EVERY_MINUTES: 15              # in Docker: blijven draaien
+      LOOKBACK_DAYS: 3
+    networks:
+      - ha_network
+
+networks:
+  ha_network:
+    external: true
+    name: ha_network
