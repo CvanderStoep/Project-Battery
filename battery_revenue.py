@@ -57,6 +57,8 @@ CHARGE_IS_POSITIVE = True   # True: positief vermogen = laden, negatief = ontlad
 TIMEZONE = "Europe/Amsterdam"
 # --------------------------------------------------------------------------
 
+print(f"Influx: {INFLUX_URL} | org={INFLUX_ORG} | bucket={BUCKET_SOURCE}")
+
 
 def flux(entity: str, fn: str, days: int) -> str:
     """
