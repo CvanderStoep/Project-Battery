@@ -16,5 +16,3 @@ USER appuser
 
 CMD ["python", "battery_revenue.py"]
 
-
-# docker compose logs -f --tail 50 battery-revenue

@@ -28,6 +28,13 @@ Configuratie:
 - `.env` bevat de standaardwaarden voor InfluxDB en de loopinstellingen
 - in `docker-compose.yml` worden sommige waarden overschreven zodat de container correct communiceert met de juiste service in Docker
 - het effect is dat dezelfde settings zowel lokaal op de Mac als in Docker kunnen werken
+- `ENERGY_TAX_EUR_KWH` (standaard `0.11`): energiebelasting in EUR/kWh, incl. btw, die bij de marktprijs (al incl. btw) van de prijssensor wordt opgeteld. Kosten, opbrengst en winst rekenen met marktprijs + energiebelasting.
+- `FEED_IN_COST_EUR_KWH` (standaard `0.0`): terugleverkosten in EUR/kWh. Zonder salderen is de terugleverprijs f = marktprijs − deze kosten.
+
+Met en zonder salderen (velden in measurement `battery_revenue`):
+- `profit_saldering_eur`: (ontladen − geladen) × a, met a = marktprijs + energiebelasting. Gelijk aan het bestaande `profit_eur`.
+- `profit_zonder_saldering_eur`: (Gi′ − Gi) × a − (Ge′ − Ge) × f. Gi/Ge is de werkelijke afname/teruglevering, Gi′/Ge′ wat het net zonder batterij had gedaan.
+- `gi_kwh`, `ge_kwh`, `gi_zonder_batt_kwh`, `ge_zonder_batt_kwh`: de energie per kwartier achter die berekening. Deze wordt per minuut berekend en per kwartier opgeteld, omdat afname en teruglevering binnen één kwartier allebei kunnen voorkomen.
 
 Voorbeeld van een run zonder schrijven naar InfluxDB:
 
