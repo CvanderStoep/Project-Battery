@@ -208,6 +208,30 @@ def plot(local: pd.DataFrame, bestand: str) -> None:
     # Auto als lijn over de afname heen: laat zien welk deel van Gi de auto is.
     ax_n.step(t, local["car_w"], where="post", color="black", linewidth=1.2,
               linestyle="--", label="laden auto")
+    # Per laadsessie van de auto de kosten erboven: kWh per kwartier x prijs a.
+    # Sessie = aaneengesloten kwartieren > 100 W; pauzes tot 30 min tellen mee.
+    car_w = local["car_w"].fillna(0)
+    sessies = []                                # [eerste, laatste] positie
+    for i, aan in enumerate(car_w > 100):
+        if not aan:
+            continue
+        if sessies and i - sessies[-1][1] <= 3:
+            sessies[-1][1] = i
+        else:
+            sessies.append([i, i])
+    for eerste, laatste in sessies:
+        sel = local.iloc[eerste:laatste + 1]
+        kwh = sel["car_w"].fillna(0) / 1000 * 0.25
+        if kwh.sum() < 0.5:                     # kort piekje, geen echte sessie
+            continue
+        kosten = (kwh * sel["price"]).sum()
+        begin, eind = sel.index[0], sel.index[-1] + pd.Timedelta(minutes=15)
+        ax_n.annotate(f"auto €{kosten:.2f}\n{kwh.sum():.1f} kWh",
+                      xy=(begin + (eind - begin) / 2, sel["gi_w"].max()),
+                      xytext=(0, 5), textcoords="offset points", ha="center", va="bottom",
+                      fontsize=8, bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                                            edgecolor="0.6"))
+    ax_n.margins(y=0.25)                        # ruimte voor de labels
     ax_n.axhline(0, color="0.5", linewidth=0.8)
     ax_n.set_ylabel("Net (W)")
     ax_n.legend(loc="upper right")
