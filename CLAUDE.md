@@ -11,7 +11,7 @@ Eén Python-script (`battery_revenue.py`) dat de financiële opbrengst van de th
 - berekent per kwartier `charged_kwh`, `discharged_kwh`, `cost_eur`, `revenue_eur`, `profit_eur`
 - schrijft dit terug als measurement `battery_revenue`; Grafana toont het
 
-Onderdeel van de bredere home-automation setup (repo `CvanderStoep/HomeAutomation`), maar draait als losse container.
+Onderdeel van de bredere home-automation setup (InfluxDB en Grafana in repo `CvanderStoep/monitoring`), maar draait als losse container.
 
 ## Structuur
 - `battery_revenue.py` — de hele app; geen `src/`-map (bewust zo houden)
