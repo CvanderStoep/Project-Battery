@@ -14,6 +14,9 @@ services:
       INFLUX_URL: http://influxdb:8086   # containernaam op ha_network, niet localhost
       RUN_EVERY_MINUTES: 15              # in Docker: blijven draaien
       LOOKBACK_DAYS: 3
+      PLOT_PORT: 8050                    # grafiek op http://raspberrypi400.local:8050/
+    ports:
+      - "8050:8050"
     networks:
       - ha_network
 

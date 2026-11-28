@@ -30,6 +30,7 @@ Configuratie:
 - het effect is dat dezelfde settings zowel lokaal op de Mac als in Docker kunnen werken
 - `ENERGY_TAX_EUR_KWH` (standaard `0.11`): energiebelasting in EUR/kWh, incl. btw, die bij de marktprijs (al incl. btw) van de prijssensor wordt opgeteld. Kosten, opbrengst en winst rekenen met marktprijs + energiebelasting.
 - `FEED_IN_COST_EUR_KWH` (standaard `0.0`): terugleverkosten in EUR/kWh. Zonder salderen is de terugleverprijs f = marktprijs − deze kosten.
+- `PLOT_PORT` (standaard `0` = uit; CLI: `--serve-port`): toont de grafiek via een kleine webserver op deze poort. Na elke run wordt de grafiek ververst; de pagina herlaadt elke minuut. In Docker staat hij op `8050`: open `http://raspberrypi400.local:8050/`.
 
 Met en zonder salderen (velden in measurement `battery_revenue`):
 - `profit_saldering_eur`: (ontladen − geladen) × a, met a = marktprijs + energiebelasting. Gelijk aan het bestaande `profit_eur`.

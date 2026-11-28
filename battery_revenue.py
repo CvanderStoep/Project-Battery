@@ -17,9 +17,12 @@ Installeren:  pip install influxdb-client pandas
 Draaien:      python battery_revenue.py --days 7 --dry-run
 """
 import argparse
+import io
 import os
+import threading
 import time
 import warnings
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pandas as pd
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -154,14 +157,15 @@ def energie_per_kwartier(minuut: pd.DataFrame) -> pd.DataFrame:
     return out.resample("15min").sum(min_count=1)
 
 
-def plot(local: pd.DataFrame, bestand: str) -> None:
+def plot(local: pd.DataFrame, doel) -> None:
     """
     Tijdreeks van zonnepanelen, prijs, batterij en net per kwartier (lokale tijd).
     Trapjes: elke waarde geldt vanaf het begin van zijn kwartier.
-    bestand leeg = venster tonen, anders opslaan als afbeelding.
+    doel: "" = venster tonen, bestandsnaam = opslaan als afbeelding,
+    BytesIO = PNG in het geheugen (voor de webserver).
     """
     import matplotlib
-    if bestand:
+    if doel != "":
         matplotlib.use("Agg")           # opslaan werkt ook zonder scherm (Pi/Docker)
     import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
@@ -271,16 +275,71 @@ def plot(local: pd.DataFrame, bestand: str) -> None:
     fig.autofmt_xdate()
     fig.tight_layout()
 
-    if bestand:
-        fig.savefig(bestand, dpi=120)
-        print(f"Grafiek opgeslagen in {bestand}")
-    else:
+    if doel == "":
         plt.show()
+    else:
+        fig.savefig(doel, dpi=120)
+        if isinstance(doel, str):
+            print(f"Grafiek opgeslagen in {doel}")
     plt.close(fig)
+
+
+# --------------------------------------------------------------------------
+# WEBSERVER (optioneel, --serve-port): laatste grafiek in de browser
+# --------------------------------------------------------------------------
+_laatste_grafiek = None     # (png-bytes, tijdstip); gezet door run(), gelezen door de server
+
+
+class GrafiekHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        pad = self.path.split("?")[0]
+        grafiek = _laatste_grafiek
+        if pad == "/plot.png" and grafiek:
+            self._stuur(200, "image/png", grafiek[0])
+        elif pad in ("/", "/index.html"):
+            if grafiek:
+                inhoud = (f'<p>Bijgewerkt: {grafiek[1]:%d-%m-%Y %H:%M}</p>'
+                          f'<img src="/plot.png?t={int(grafiek[1].timestamp())}" alt="Batterijgrafiek">')
+            else:
+                inhoud = "<p>Nog geen grafiek: de eerste berekening loopt nog.</p>"
+            html = ('<!doctype html><html lang="nl"><head><meta charset="utf-8">'
+                    '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                    '<meta http-equiv="refresh" content="60"><title>Thuisbatterij</title>'
+                    '<style>body{font-family:sans-serif;margin:16px;background:#fff;color:#222}'
+                    'img{max-width:100%;height:auto}</style></head>'
+                    f'<body><h1>Thuisbatterij</h1>{inhoud}</body></html>')
+            self._stuur(200, "text/html; charset=utf-8", html.encode())
+        else:
+            self._stuur(404, "text/plain; charset=utf-8", "Niet gevonden".encode())
+
+    def _stuur(self, status: int, soort: str, body: bytes) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", soort)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):       # geen logregel per verzoek
+        pass
+
+
+def start_webserver(poort: int) -> bool:
+    """Start de webserver in een achtergrondthread; False als dat niet lukt."""
+    try:
+        server = ThreadingHTTPServer(("0.0.0.0", poort), GrafiekHandler)
+    except OSError as e:                # bv. poort al in gebruik: rekenen gaat gewoon door
+        print(f"Webserver niet gestart op poort {poort}: {e}", flush=True)
+        return False
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"Grafiek via webserver: http://localhost:{poort}/ (op de Pi: "
+          f"http://raspberrypi400.local:{poort}/)", flush=True)
+    return True
 
 
 def run(args) -> None:
     """Eén berekening over de laatste `args.days` dagen."""
+    global _laatste_grafiek
     with InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG, timeout=60_000) as client:
         # Batterij en net per minuut (nodig voor 'zonder salderen');
         # het kwartiergemiddelde volgt daar zelf uit.
@@ -355,6 +414,14 @@ def run(args) -> None:
         if args.plot is not None:
             plot(local, args.plot)
 
+        if args.serve_port > 0:
+            try:
+                buf = io.BytesIO()
+                plot(local, buf)
+                _laatste_grafiek = (buf.getvalue(), pd.Timestamp.now(tz=TIMEZONE))
+            except Exception as e:          # mislukte grafiek mag het schrijven niet tegenhouden
+                print(f"Grafiek voor webserver mislukt: {e}", flush=True)
+
         if args.dry_run:
             return
 
@@ -383,14 +450,28 @@ def main() -> None:
     ap.add_argument("--plot", nargs="?", const="", default=None, metavar="BESTAND",
                     help="toon een grafiek van prijs en batterijvermogen; "
                          "met BESTAND (bv. plot.png) wordt hij opgeslagen")
+    ap.add_argument("--serve-port", type=int, default=int(os.getenv("PLOT_PORT", "0")),
+                    metavar="POORT",
+                    help="0 = uit; >0 = laatste grafiek tonen via een webserver op deze poort "
+                         "(env: PLOT_PORT)")
     args = ap.parse_args()
 
     if args.plot == "" and args.every_minutes > 0:
         ap.error("--plot zonder bestand blokkeert de service-modus; "
                  "geef --every-minutes 0 mee of een bestandsnaam")
+    if args.plot == "" and args.serve_port > 0:
+        ap.error("--plot zonder bestand opent een venster; combineer dat niet met --serve-port")
+
+    serveert = args.serve_port > 0 and start_webserver(args.serve_port)
 
     if args.every_minutes <= 0:
         run(args)
+        if serveert and _laatste_grafiek:   # eenmalig: blijf de grafiek serveren
+            print("Ctrl+C om te stoppen.", flush=True)
+            try:
+                threading.Event().wait()
+            except KeyboardInterrupt:
+                pass
         return
 
     print(f"Service-modus: elke {args.every_minutes} min, laatste {args.days} dagen.", flush=True)
