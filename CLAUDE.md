@@ -1,4 +1,4 @@
-# CLAUDE.md — Project Battery
+# CLAUDE.md — battery-revenue
 
 Communiceer in het Nederlands. Code-commentaar en output van het script zijn ook Nederlands.
 
@@ -10,6 +10,8 @@ Eén Python-script (`battery_revenue.py`) dat de financiële opbrengst van de th
 - brengt beide naar een kwartierraster (Flux `aggregateWindow` + `fill(usePrevious)`, omdat HA alleen bij wijziging schrijft)
 - berekent per kwartier `charged_kwh`, `discharged_kwh`, `cost_eur`, `revenue_eur`, `profit_eur`
 - schrijft dit terug als measurement `battery_revenue`; Grafana toont het
+- toont optioneel de laatste grafiek via een kleine webserver (`--serve-port` / `PLOT_PORT`; in Docker poort 8050,
+  op de Pi http://raspberrypi400.local:8050/)
 
 Onderdeel van de bredere home-automation setup (InfluxDB en Grafana in repo `CvanderStoep/monitoring`), maar draait als losse container.
 
@@ -32,6 +34,8 @@ docker logs -f --tail 50 battery-revenue                   # logs bekijken
 
 ## Deployment (Raspberry Pi 400)
 - Draait op `raspberrypi400` (gebruiker `pi`) in `~/battery-revenue`
+- Overal dezelfde naam: map `battery-revenue/` op de Mac, `~/battery-revenue` op de Pi, GitHub `CvanderStoep/battery-revenue`
+  (tot 2026-11-28: `battery` op de Mac, `Project-Battery` op de Pi en GitHub). Compose-`name:` en container: `battery-revenue`.
 - Werkwijze: wijzigen op de Mac → commit/push → op de Pi `git pull` → `docker compose up --build -d`
 - `.env` gaat apart mee: `scp .env pi@raspberrypi400.local:~/battery-revenue/.env`
 - In Docker overschrijft `docker-compose.yml` o.a. `INFLUX_URL=http://influxdb:8086`, `RUN_EVERY_MINUTES=15`, `LOOKBACK_DAYS=3`. Lokaal op de Mac komt alles uit `.env` (localhost).
