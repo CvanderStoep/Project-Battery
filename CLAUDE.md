@@ -31,9 +31,9 @@ docker logs -f --tail 50 battery-revenue                   # logs bekijken
 ```
 
 ## Deployment (Raspberry Pi 400)
-- Draait op `raspberrypi400` (gebruiker `pi`) in `~/Project-Battery`
+- Draait op `raspberrypi400` (gebruiker `pi`) in `~/battery-revenue`
 - Werkwijze: wijzigen op de Mac → commit/push → op de Pi `git pull` → `docker compose up --build -d`
-- `.env` gaat apart mee: `scp .env pi@raspberrypi400.local:~/Project-Battery/.env`
+- `.env` gaat apart mee: `scp .env pi@raspberrypi400.local:~/battery-revenue/.env`
 - In Docker overschrijft `docker-compose.yml` o.a. `INFLUX_URL=http://influxdb:8086`, `RUN_EVERY_MINUTES=15`, `LOOKBACK_DAYS=3`. Lokaal op de Mac komt alles uit `.env` (localhost).
 
 ## Regels
